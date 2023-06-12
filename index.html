@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Data Stok Barang</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
+</head>
+<body>
+  <h1>Data Stok Barang</h1>
+
+  <button id="addButton">Tambah Barang</button>
+
+  <table id="inventoryTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nama Barang</th>
+        <th>Jumlah</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="addDialog" title="Tambah Barang">
+    <form id="addForm">
+      <label for="addId">ID:</label>
+      <input type="text" id="addId" name="addId">
+      <br>
+      <label for="addName">Nama Barang:</label>
+      <input type="text" id="addName" name="addName">
+      <br>
+      <label for="addQuantity">Jumlah:</label>
+      <input type="text" id="addQuantity" name="addQuantity">
+      <br>
+      <input type="submit" value="Tambah">
+    </form>
+  </div>
+
+  <div id="updateDialog" title="Ubah Barang">
+    <form id="updateForm">
+      <input type="hidden" id="updateId" name="updateId">
+      <label for="updateName">Nama Barang:</label>
+      <input type="text" id="updateName" name="updateName">
+      <br>
+      <label for="updateQuantity">Jumlah:</label>
+      <input type="text" id="updateQuantity" name="updateQuantity">
+      <br>
+      <input type="submit" value="Simpan">
+    </form>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/jquery.validation/1.16.0/jquery.validate.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      // Tabel Data Stok Barang
+      var inventoryTable = $('#inventoryTable').DataTable({
+        columns: [
+          { data: 'id' },
+          { data: 'name' },
+          { data: 'quantity' },
+          {
+            data: null,
+            render: function(data, type, row) {
+              return '<button class="editButton" data-id="' + row.id + '">Edit</button>' +
+                     '<button class="deleteButton" data-id="' + row.id + '">Hapus</button>';
+            }
+          }
+        ]
+      });
+
+      // Mendapatkan data stok barang dari REST API
+      $.ajax({
+        url: 'http://localhost:3000/api/inventory',
+        method: 'GET',
+        success: function(response) {
+          // Mengisi tabel dengan data stok barang
+          inventoryTable.rows.add(response).draw();
+        },
+        error: function() {
+          alert('Gagal mendapatkan data stok barang.');
+        }
+      });
+
+      // Dialog Form Tambah Barang
+      var addDialog = $('#addDialog').dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+          'Tambah': function() {
+            // Validasi form tambah stok barang
+            var isValid = $('#addForm').valid();
+            if (!isValid) return;
+
+            // Mengambil data dari form tambah
+            var id = $('#addId').val();
+            var name = $('#addName').val();
+            var quantity = parseInt($('#addQuantity').val());
+
+            // Mengirim data stok barang baru ke REST API
+            $.ajax({
+              url: 'http://localhost:3000/api/inventory',
+              method: 'POST',
+              contentType: 'application/json',
+              data: JSON.stringify({ id: id, name: name, quantity: quantity }),
+              success: function() {
+                // Menutup dialog, me-reset form, dan memperbarui tabel
+                addDialog.dialog('close');
+                $('#addForm')[0].reset();
+                inventoryTable.ajax.reload();
+              },
+              error: function() {
+                alert('Gagal menambah barang.');
+              }
+            });
+          },
+          'Batal': function() {
+            addDialog.dialog('close');
+          }
+        }
+      });
+
+      // Tombol Tambah Barang
+      $('#addButton').button().click(function() {
+        // Reset form tambah
+        $('#addForm')[0].reset();
+        $('#addForm').validate().resetForm();
+        addDialog.dialog('open');
+      });
+
+      // Dialog Form Ubah Barang
+      var updateDialog = $('#updateDialog').dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+          'Simpan': function() {
+            // Validasi form ubah stok barang
+            var isValid = $('#updateForm').valid();
+            if (!isValid) return;
+
+            // Mengambil data dari form ubah
+            var id = $('#updateId').val();
+            var name = $('#updateName').val();
+            var quantity = parseInt($('#updateQuantity').val());
+
+            // Mengirim data stok barang yang diubah ke REST API
+            $.ajax({
+              url: 'http://localhost:3000/api/inventory/' + id,
+              method: 'PUT',
+              contentType: 'application/json',
+              data: JSON.stringify({ name: name, quantity: quantity }),
+              success: function() {
+                // Menutup dialog, me-reset form, dan memperbarui tabel
+                updateDialog.dialog('close');
+                $('#updateForm')[0].reset();
+                inventoryTable.ajax.reload();
+              },
+              error: function() {
+                alert('Gagal mengubah barang.');
+              }
+            });
+          },
+          'Batal': function() {
+            updateDialog.dialog('close');
+          }
+        }
+      });
+
+      // Tombol Edit pada Tabel
+      $('#inventoryTable').on('click', '.editButton', function() {
+        var id = $(this).data('id');
+
+        // Mendapatkan data stok barang berdasarkan ID dari REST API
+        $.ajax({
+          url: 'http://localhost:3000/api/inventory/' + id,
+          method: 'GET',
+          success: function(response) {
+            // Mengisi form ubah dengan data stok barang yang akan diubah
+            $('#updateId').val(response.id);
+            $('#updateName').val(response.name);
+            $('#updateQuantity').val(response.quantity);
+
+            // Membuka dialog form ubah
+            updateDialog.dialog('open');
+          },
+          error: function() {
+            alert('Gagal mendapatkan data barang.');
+          }
+        });
+      });
+
+      // Tombol Hapus pada Tabel
+      $('#inventoryTable').on('click', '.deleteButton', function() {
+        var id = $(this).data('id');
+
+        // Menghapus data stok barang berdasarkan ID dari REST API
+        $.ajax({
+          url: 'http://localhost:3000/api/inventory/' + id,
+          method: 'DELETE',
+          success: function() {
+            // Memperbarui tabel setelah menghapus data
+            inventoryTable.ajax.reload();
+          },
+          error: function() {
+            alert('Gagal menghapus barang.');
+          }
+        });
+      });
+
+      // Validasi Form Tambah Barang
+      $('#addForm').validate({
+        rules: {
+          addId: 'required',
+          addName: 'required',
+          addQuantity: {
+            required: true,
+            digits: true
+          }
+        },
+        messages: {
+          addId: 'Harap masukkan ID.',
+          addName: 'Harap masukkan nama barang.',
+          addQuantity: {
+            required: 'Harap masukkan jumlah barang.',
+            digits: 'Harap masukkan jumlah barang yang valid (hanya angka).'
+          }
+        }
+      });
+
+      // Validasi Form Ubah Barang
+      $('#updateForm').validate({
+        rules: {
+          updateName: 'required',
+          updateQuantity: {
+            required: true,
+            digits: true
+          }
+        },
+        messages: {
+          updateName: 'Harap masukkan nama barang.',
+          updateQuantity: {
+            required: 'Harap masukkan jumlah barang.',
+            digits: 'Harap masukkan jumlah barang yang valid (hanya angka).'
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
